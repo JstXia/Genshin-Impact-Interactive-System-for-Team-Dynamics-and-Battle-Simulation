@@ -8,11 +8,18 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.sql.SQLException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+
+
 public class MainUI extends JFrame {
-    // Top-level
+    
+    private static final String DUELIST = "DUELIST";
+    private static final String MAGE = "MAGE";
+    private static final String BOSS_MAGE = "BOSS_MAGE";
+    private static final String TANK_BOSS = "TANK_BOSS";
     private JTabbedPane tabs = new JTabbedPane();
 
     public MainUI() {
@@ -165,7 +172,7 @@ public class MainUI extends JFrame {
         });
 
         return p;
-    }
+    }   
 
     // ---------------- WEAPONS TAB ----------------
     private JPanel buildWeaponPanel() {
@@ -417,314 +424,819 @@ public class MainUI extends JFrame {
     }
 
     // ---------------- MOBS TAB ----------------
-    private JPanel buildMobPanel() {
-        JPanel p = new JPanel(new BorderLayout());
-        DefaultTableModel tm = new DefaultTableModel();
-        JTable table = new JTable(tm);
-        p.add(new JScrollPane(table), BorderLayout.CENTER);
+private JPanel buildMobPanel() {
+    JPanel p = new JPanel(new BorderLayout());
 
-        JPanel form = new JPanel(new GridLayout(0,2,6,6));
-        JTextField tfID = new JTextField(); tfID.setEditable(false);
-        JTextField tfName = new JTextField(), tfRegion = new JTextField(), tfLevel = new JTextField(), tfType = new JTextField(),
-                tfElement = new JTextField(), tfHP = new JTextField(), tfATK = new JTextField(), tfDEF = new JTextField(),
-                tfCritRate = new JTextField(), tfCritDmg = new JTextField();
+    DefaultTableModel tm = new DefaultTableModel();
+    JTable table = new JTable(tm);
+    p.add(new JScrollPane(table), BorderLayout.CENTER);
 
-        form.add(new JLabel("MobID")); form.add(tfID);
-        form.add(new JLabel("Name")); form.add(tfName);
-        form.add(new JLabel("Region")); form.add(tfRegion);
-        form.add(new JLabel("Level")); form.add(tfLevel);
-        form.add(new JLabel("Type")); form.add(tfType);
-        form.add(new JLabel("Element")); form.add(tfElement);
-        form.add(new JLabel("HP")); form.add(tfHP);
-        form.add(new JLabel("ATK")); form.add(tfATK);
-        form.add(new JLabel("DEF")); form.add(tfDEF);
-        form.add(new JLabel("CritRate (%)")); form.add(tfCritRate);
-        form.add(new JLabel("CritDmg (%)")); form.add(tfCritDmg);
+    // ===== FORM =====
+    JPanel form = new JPanel(new GridLayout(0, 2, 6, 6));
 
-        JPanel controls = new JPanel();
-        JButton btnAdd = new JButton("Add"), btnUpdate = new JButton("Update"), btnDelete = new JButton("Delete"), btnRefresh = new JButton("Refresh");
-        controls.add(btnRefresh); controls.add(btnAdd); controls.add(btnUpdate); controls.add(btnDelete);
+    JTextField tfID = new JTextField();
+    tfID.setEditable(false);
 
-        p.add(form, BorderLayout.EAST);
-        p.add(controls, BorderLayout.SOUTH);
+    JTextField tfName = new JTextField();
+    JTextField tfRegion = new JTextField();
+    JTextField tfLevel = new JTextField();
 
-        Runnable reload = () -> {
-            try {
-                tm.setRowCount(0); tm.setColumnCount(0);
-                List<Map<String,Object>> rows = DBManager.fetchAll("SELECT * FROM mobstable");
-                if (rows.isEmpty()) return;
-                rows.get(0).keySet().forEach(k -> tm.addColumn(k));
-                for (Map<String,Object> r : rows) tm.addRow(r.values().toArray());
-            } catch (SQLException ex) { showError(ex); }
-        };
-        btnRefresh.addActionListener(e -> reload.run());
-        reload.run();
+    JComboBox<String> cbType = new JComboBox<>(
+            new String[]{"Duelist", "Mage", "Boss Mage", "Tank Boss"}
+    );
 
-        btnAdd.addActionListener(e -> {
-            try {
-                DBManager.execute("INSERT INTO mobstable (Name,Region,Level,Type,Element,HP,ATK,DEF,CritRate,CritDmg) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                        nonEmpty(tfName.getText()), nonEmpty(tfRegion.getText()), parseInt(tfLevel.getText()), nonEmpty(tfType.getText()),
-                        nonEmpty(tfElement.getText()), parseInt(tfHP.getText()), parseInt(tfATK.getText()), parseInt(tfDEF.getText()),
-                        parseDouble(tfCritRate.getText()), parseDouble(tfCritDmg.getText()));
-                clearFields(tfName, tfRegion, tfLevel, tfType, tfElement, tfHP, tfATK, tfDEF, tfCritRate, tfCritDmg);
-                reload.run();
-            } catch (SQLException ex) { showError(ex); }
-        });
+    JTextField tfElement = new JTextField();
+    JTextField tfHP = new JTextField();
+    JTextField tfATK = new JTextField();
+    JTextField tfDEF = new JTextField();
+    JTextField tfCritRate = new JTextField();
+    JTextField tfCritDmg = new JTextField();
 
-        btnUpdate.addActionListener(e -> {
-            try {
-                int sel = table.getSelectedRow(); if (sel<0) { JOptionPane.showMessageDialog(this,"Select a row."); return;}
-                Object id = tm.getValueAt(sel,0);
-                DBManager.execute("UPDATE mobstable SET Name=?,Region=?,Level=?,Type=?,Element=?,HP=?,ATK=?,DEF=?,CritRate=?,CritDmg=? WHERE MobID=?",
-                        nonEmpty(tfName.getText()), nonEmpty(tfRegion.getText()), parseInt(tfLevel.getText()), nonEmpty(tfType.getText()),
-                        nonEmpty(tfElement.getText()), parseInt(tfHP.getText()), parseInt(tfATK.getText()), parseInt(tfDEF.getText()),
-                        parseDouble(tfCritRate.getText()), parseDouble(tfCritDmg.getText()), id);
-                clearFields(tfID, tfName, tfRegion, tfLevel, tfType, tfElement, tfHP, tfATK, tfDEF, tfCritRate, tfCritDmg);
-                reload.run();
-            } catch (SQLException ex) { showError(ex); }
-        });
+    form.add(new JLabel("MobID")); form.add(tfID);
+    form.add(new JLabel("Name")); form.add(tfName);
+    form.add(new JLabel("Region")); form.add(tfRegion);
+    form.add(new JLabel("Level")); form.add(tfLevel);
+    form.add(new JLabel("Type")); form.add(cbType);
+    form.add(new JLabel("Element")); form.add(tfElement);
+    form.add(new JLabel("HP")); form.add(tfHP);
+    form.add(new JLabel("ATK")); form.add(tfATK);
+    form.add(new JLabel("DEF")); form.add(tfDEF);
+    form.add(new JLabel("Crit Rate")); form.add(tfCritRate);
+    form.add(new JLabel("Crit Dmg")); form.add(tfCritDmg);
 
-        btnDelete.addActionListener(e -> {
-            try { int sel = table.getSelectedRow(); if (sel<0) return; Object id = tm.getValueAt(sel,0);
-                DBManager.execute("DELETE FROM mobstable WHERE MobID=?", id); reload.run();
-            } catch (SQLException ex) { showError(ex); }
-        });
+    // ===== CONTROLS =====
+    JPanel controls = new JPanel();
+    JButton btnAdd = new JButton("Add");
+    JButton btnUpdate = new JButton("Update");
+    JButton btnDelete = new JButton("Delete");
+    JButton btnRefresh = new JButton("Refresh");
 
-        table.getSelectionModel().addListSelectionListener(e -> {
-            int sel = table.getSelectedRow(); if (sel<0) return;
-            tfID.setText(String.valueOf(tm.getValueAt(sel,0)));
-            tfName.setText(str(tm.getValueAt(sel,1))); tfRegion.setText(str(tm.getValueAt(sel,2)));
-            tfLevel.setText(str(tm.getValueAt(sel,3))); tfType.setText(str(tm.getValueAt(sel,4)));
-            tfElement.setText(str(tm.getValueAt(sel,5))); tfHP.setText(str(tm.getValueAt(sel,6)));
-            tfATK.setText(str(tm.getValueAt(sel,7))); tfDEF.setText(str(tm.getValueAt(sel,8)));
-            tfCritRate.setText(str(tm.getValueAt(sel,9))); tfCritDmg.setText(str(tm.getValueAt(sel,10)));
-        });
+    controls.add(btnRefresh);
+    controls.add(btnAdd);
+    controls.add(btnUpdate);
+    controls.add(btnDelete);
 
-        return p;
-    }
+    p.add(form, BorderLayout.EAST);
+    p.add(controls, BorderLayout.SOUTH);
 
-    // ---------------- DOMAIN TAB ----------------
-    private JPanel buildDomainPanel() {
-        JPanel p = new JPanel(new BorderLayout());
-        DefaultTableModel tm = new DefaultTableModel();
-        JTable table = new JTable(tm);
-        p.add(new JScrollPane(table), BorderLayout.CENTER);
+    // ===== LOAD DATA =====
+    Runnable reload = () -> {
+        try {
+            tm.setRowCount(0);
+            tm.setColumnCount(0);
 
-        JPanel form = new JPanel(new GridLayout(0,2,6,6));
-        JTextField tfID = new JTextField(); tfID.setEditable(false);
-        JTextField tfName = new JTextField(), tfRegion = new JTextField();
-        JComboBox<String> cbDifficulty = new JComboBox<>(new String[]{"Easy","Medium","Hard","Extreme"});
+            List<Map<String, Object>> rows =
+                    DBManager.fetchAll("SELECT * FROM mobstable");
 
-        form.add(new JLabel("DomainID")); form.add(tfID);
-        form.add(new JLabel("Name")); form.add(tfName);
-        form.add(new JLabel("Region")); form.add(tfRegion);
-        form.add(new JLabel("Difficulty")); form.add(cbDifficulty);
+            if (!rows.isEmpty()) {
+                rows.get(0).keySet().forEach(tm::addColumn);
+                for (Map<String, Object> r : rows) {
+                    tm.addRow(r.values().toArray());
+                }
+            }
 
-        JPanel controls = new JPanel();
-        JButton btnAdd = new JButton("Add"), btnUpdate = new JButton("Update"), btnDelete = new JButton("Delete"), btnRefresh = new JButton("Refresh");
-        controls.add(btnRefresh); controls.add(btnAdd); controls.add(btnUpdate); controls.add(btnDelete);
+        } catch (SQLException ex) {
+            showError(ex);
+        }
+    };
 
-        p.add(form, BorderLayout.EAST);
-        p.add(controls, BorderLayout.SOUTH);
+    btnRefresh.addActionListener(e -> reload.run());
+    reload.run();
 
-        Runnable reload = () -> {
-            try {
-                tm.setRowCount(0); tm.setColumnCount(0);
-                List<Map<String,Object>> rows = DBManager.fetchAll("SELECT * FROM domaintable");
-                if (rows.isEmpty()) return;
-                rows.get(0).keySet().forEach(k -> tm.addColumn(k));
-                for (Map<String,Object> r : rows) tm.addRow(r.values().toArray());
-            } catch (SQLException ex) { showError(ex); }
-        };
-        btnRefresh.addActionListener(e -> reload.run());
-        reload.run();
+    // ===== ADD MOB =====
+    btnAdd.addActionListener(e -> {
+        try {
+            DBManager.execute(
+                    "INSERT INTO mobstable (Name,Region,Level,MobType,Element,HP,ATK,DEF,CritRate,CritDmg) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    nonEmpty(tfName.getText()),
+                    nonEmpty(tfRegion.getText()),
+                    parseInt(tfLevel.getText()),
+                    cbType.getSelectedItem().toString(),
+                    nonEmpty(tfElement.getText()),
+                    parseInt(tfHP.getText()),
+                    parseInt(tfATK.getText()),
+                    parseInt(tfDEF.getText()),
+                    parseDouble(tfCritRate.getText()),
+                    parseDouble(tfCritDmg.getText())
+            );
 
-        btnAdd.addActionListener(e -> {
-            try {
-                DBManager.execute("INSERT INTO domaintable (Name,Region,Difficulty) VALUES (?,?,?)",
-                        nonEmpty(tfName.getText()), nonEmpty(tfRegion.getText()), (String) cbDifficulty.getSelectedItem());
-                clearFields(tfName, tfRegion);
-                reload.run();
-            } catch (SQLException ex) { showError(ex); }
-        });
+            clearFields(tfName, tfRegion, tfLevel, tfElement, tfHP, tfATK, tfDEF, tfCritRate, tfCritDmg);
+            reload.run();
 
-        btnUpdate.addActionListener(e -> {
-            try {
-                int sel = table.getSelectedRow(); if (sel<0) { JOptionPane.showMessageDialog(this,"Select a row."); return;}
-                Object id = tm.getValueAt(sel,0);
-                DBManager.execute("UPDATE domaintable SET Name=?,Region=?,Difficulty=? WHERE DomainID=?",
-                        nonEmpty(tfName.getText()), nonEmpty(tfRegion.getText()), (String) cbDifficulty.getSelectedItem(), id);
-                clearFields(tfID, tfName, tfRegion);
-                reload.run();
-            } catch (SQLException ex) { showError(ex); }
-        });
+        } catch (SQLException ex) {
+            showError(ex);
+        }
+    });
 
-        btnDelete.addActionListener(e -> {
-            try { int sel = table.getSelectedRow(); if (sel<0) return; Object id = tm.getValueAt(sel,0);
-                DBManager.execute("DELETE FROM domaintable WHERE DomainID=?", id); reload.run();
-            } catch (SQLException ex) { showError(ex); }
-        });
+    // ===== UPDATE MOB =====
+    btnUpdate.addActionListener(e -> {
+        try {
+            int sel = table.getSelectedRow();
+            if (sel < 0) {
+                JOptionPane.showMessageDialog(this, "Select a row.");
+                return;
+            }
 
-        table.getSelectionModel().addListSelectionListener(e -> {
-            int sel = table.getSelectedRow(); if (sel<0) return;
-            tfID.setText(String.valueOf(tm.getValueAt(sel,0)));
-            tfName.setText(str(tm.getValueAt(sel,1))); tfRegion.setText(str(tm.getValueAt(sel,2)));
-            cbDifficulty.setSelectedItem(str(tm.getValueAt(sel,3)));
-        });
+            Object id = tm.getValueAt(sel, 0);
 
-        return p;
-    }
+            DBManager.execute(
+                    "UPDATE mobstable SET Name=?,Region=?,Level=?,MobType=?,Element=?,HP=?,ATK=?,DEF=?,CritRate=?,CritDmg=? WHERE MobID=?",
+                    nonEmpty(tfName.getText()),
+                    nonEmpty(tfRegion.getText()),
+                    parseInt(tfLevel.getText()),
+                    cbType.getSelectedItem().toString(),
+                    nonEmpty(tfElement.getText()),
+                    parseInt(tfHP.getText()),
+                    parseInt(tfATK.getText()),
+                    parseInt(tfDEF.getText()),
+                    parseDouble(tfCritRate.getText()),
+                    parseDouble(tfCritDmg.getText()),
+                    id
+            );
 
+            clearFields(tfID, tfName, tfRegion, tfLevel, tfElement, tfHP, tfATK, tfDEF, tfCritRate, tfCritDmg);
+            reload.run();
+
+        } catch (SQLException ex) {
+            showError(ex);
+        }
+    });
+
+    // ===== DELETE MOB =====
+    btnDelete.addActionListener(e -> {
+        try {
+            int sel = table.getSelectedRow();
+            if (sel < 0) return;
+
+            Object id = tm.getValueAt(sel, 0);
+
+            DBManager.execute("DELETE FROM mobstable WHERE MobID=?", id);
+            reload.run();
+
+        } catch (SQLException ex) {
+            showError(ex);
+        }
+    });
+
+    // ===== SELECT ROW =====
+    table.getSelectionModel().addListSelectionListener(e -> {
+        int sel = table.getSelectedRow();
+        if (sel < 0) return;
+
+        tfID.setText(str(tm.getValueAt(sel, 0)));
+        tfName.setText(str(tm.getValueAt(sel, 1)));
+        tfRegion.setText(str(tm.getValueAt(sel, 2)));
+        tfLevel.setText(str(tm.getValueAt(sel, 3)));
+        cbType.setSelectedItem(str(tm.getValueAt(sel, 4)));
+        tfElement.setText(str(tm.getValueAt(sel, 5)));
+        tfHP.setText(str(tm.getValueAt(sel, 6)));
+        tfATK.setText(str(tm.getValueAt(sel, 7)));
+        tfDEF.setText(str(tm.getValueAt(sel, 8)));
+        tfCritRate.setText(str(tm.getValueAt(sel, 9)));
+        tfCritDmg.setText(str(tm.getValueAt(sel, 10)));
+    });
+
+    return p;
+}
+private JPanel buildDomainPanel() {
+    JPanel p = new JPanel(new BorderLayout());
+
+    DefaultTableModel tm = new DefaultTableModel();
+    JTable table = new JTable(tm);
+    p.add(new JScrollPane(table), BorderLayout.CENTER);
+
+    // ===== FORM =====
+    JPanel form = new JPanel(new GridLayout(0, 2, 6, 6));
+
+    JTextField tfID = new JTextField();
+    tfID.setEditable(false);
+
+    JTextField tfName = new JTextField();
+    JTextField tfRegion = new JTextField();
+
+    JComboBox<String> cbDifficulty =
+            new JComboBox<>(new String[]{"Easy", "Medium", "Hard", "Extreme"});
+
+    JComboBox<String> cbMob = new JComboBox<>();
+
+    JButton btnAddMob = new JButton("Add Mob to Domain");
+    JButton btnViewMobs = new JButton("View Domain Mobs");
+
+    form.add(new JLabel("DomainID"));
+    form.add(tfID);
+
+    form.add(new JLabel("Name"));
+    form.add(tfName);
+
+    form.add(new JLabel("Region"));
+    form.add(tfRegion);
+
+    form.add(new JLabel("Difficulty"));
+    form.add(cbDifficulty);
+
+    form.add(new JLabel("Select Mob"));
+    form.add(cbMob);
+
+    form.add(btnAddMob);
+    form.add(btnViewMobs);
+
+    // ===== CONTROLS =====
+    JPanel controls = new JPanel();
+    JButton btnAdd = new JButton("Add");
+    JButton btnUpdate = new JButton("Update");
+    JButton btnDelete = new JButton("Delete");
+    JButton btnRefresh = new JButton("Refresh");
+
+    controls.add(btnRefresh);
+    controls.add(btnAdd);
+    controls.add(btnUpdate);
+    controls.add(btnDelete);
+
+    p.add(form, BorderLayout.EAST);
+    p.add(controls, BorderLayout.SOUTH);
+
+    // ===== LOAD DATA =====
+    Runnable reload = () -> {
+        try {
+            tm.setRowCount(0);
+            tm.setColumnCount(0);
+
+            List<Map<String, Object>> rows =
+                    DBManager.fetchAll("SELECT * FROM domaintable");
+
+            if (!rows.isEmpty()) {
+                rows.get(0).keySet().forEach(tm::addColumn);
+                for (Map<String, Object> r : rows) {
+                    tm.addRow(r.values().toArray());
+                }
+            }
+
+            // reload mobs dropdown
+            cbMob.removeAllItems();
+
+            List<Map<String, Object>> mobs =
+                    DBManager.fetchAll("SELECT * FROM mobstable");
+
+            for (Map<String, Object> m : mobs) {
+                cbMob.addItem(m.get("MobID") + " - " + m.get("Name"));
+            }
+
+        } catch (SQLException ex) {
+            showError(ex);
+        }
+    };
+
+    btnRefresh.addActionListener(e -> reload.run());
+    reload.run();
+
+    // ===== ADD DOMAIN =====
+    btnAdd.addActionListener(e -> {
+        try {
+            DBManager.execute(
+                    "INSERT INTO domaintable (Name,Region,Difficulty) VALUES (?,?,?)",
+                    nonEmpty(tfName.getText()),
+                    nonEmpty(tfRegion.getText()),
+                    cbDifficulty.getSelectedItem()
+            );
+
+            clearFields(tfName, tfRegion);
+            reload.run();
+
+        } catch (SQLException ex) {
+            showError(ex);
+        }
+    });
+
+    // ===== UPDATE DOMAIN =====
+    btnUpdate.addActionListener(e -> {
+        try {
+            int sel = table.getSelectedRow();
+            if (sel < 0) {
+                JOptionPane.showMessageDialog(this, "Select a domain row.");
+                return;
+            }
+
+            Object id = tm.getValueAt(sel, 0);
+
+            DBManager.execute(
+                    "UPDATE domaintable SET Name=?,Region=?,Difficulty=? WHERE DomainID=?",
+                    nonEmpty(tfName.getText()),
+                    nonEmpty(tfRegion.getText()),
+                    cbDifficulty.getSelectedItem(),
+                    id
+            );
+
+            clearFields(tfID, tfName, tfRegion);
+            reload.run();
+
+        } catch (SQLException ex) {
+            showError(ex);
+        }
+    });
+
+    // ===== DELETE DOMAIN =====
+    btnDelete.addActionListener(e -> {
+        try {
+            int sel = table.getSelectedRow();
+            if (sel < 0) return;
+
+            Object id = tm.getValueAt(sel, 0);
+
+            DBManager.execute("DELETE FROM domain_mobs WHERE DomainID=?", id);
+            DBManager.execute("DELETE FROM domaintable WHERE DomainID=?", id);
+
+            reload.run();
+
+        } catch (SQLException ex) {
+            showError(ex);
+        }
+    });
+
+    // ===== ADD MOB TO DOMAIN =====
+    btnAddMob.addActionListener(e -> {
+        try {
+            int sel = table.getSelectedRow();
+            if (sel < 0) {
+                JOptionPane.showMessageDialog(this, "Select a domain first.");
+                return;
+            }
+
+            Object domainId = tm.getValueAt(sel, 0);
+
+            String selected = (String) cbMob.getSelectedItem();
+            if (selected == null || !selected.contains(" - ")) return;
+
+            int mobId = Integer.parseInt(selected.split(" - ")[0].trim());
+
+            // prevent duplicate insert
+            List<Map<String, Object>> check =
+                    DBManager.fetchAll(
+                            "SELECT * FROM domain_mobs WHERE DomainID=? AND MobID=?",
+                            domainId, mobId
+                    );
+
+            if (!check.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Mob already added to this domain.");
+                return;
+            }
+
+            DBManager.execute(
+                    "INSERT INTO domain_mobs (DomainID, MobID) VALUES (?, ?)",
+                    domainId, mobId
+            );
+
+            JOptionPane.showMessageDialog(this, "Mob added to domain!");
+
+        } catch (Exception ex) {
+            showError(ex);
+        }
+    });
+
+    // ===== VIEW DOMAIN MOBS =====
+    btnViewMobs.addActionListener(e -> {
+        try {
+            int sel = table.getSelectedRow();
+            if (sel < 0) return;
+
+            Object domainId = tm.getValueAt(sel, 0);
+
+            List<Map<String, Object>> mobs =
+                    DBManager.fetchAll(
+                            "SELECT m.* FROM mobstable m " +
+                                    "JOIN domain_mobs dm ON m.MobID = dm.MobID " +
+                                    "WHERE dm.DomainID=?",
+                                    domainId
+                    );
+
+            if (mobs.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "No mobs in this domain.");
+            return;
+            }
+
+            StringBuilder sb = new StringBuilder("Domain Mobs:\n\n");
+
+            for (Map<String, Object> m : mobs) {
+                sb.append(m.get("MobID"))
+                        .append(" - ")
+                        .append(m.get("Name"))
+                        .append(" (")
+                        .append(m.get("MobType"))
+                        .append(")\n");
+            }
+
+            JOptionPane.showMessageDialog(this, sb.toString());
+
+        } catch (SQLException ex) {
+            showError(ex);
+        }
+    });
+
+    // ===== ROW SELECT =====
+    table.getSelectionModel().addListSelectionListener(e -> {
+        int sel = table.getSelectedRow();
+        if (sel < 0) return;
+
+        tfID.setText(str(tm.getValueAt(sel, 0)));
+        tfName.setText(str(tm.getValueAt(sel, 1)));
+        tfRegion.setText(str(tm.getValueAt(sel, 2)));
+        cbDifficulty.setSelectedItem(str(tm.getValueAt(sel, 3)));
+    });
+
+    return p;
+}
     // ---------------- SIMULATOR TAB ----------------
-    private JPanel buildSimulatorPanel() {
-        JPanel p = new JPanel(new BorderLayout());
-        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JComboBox<model.DomainModel> cbDomain = new JComboBox<>();
-        JComboBox<model.TeamModel> cbTeam = new JComboBox<>();
-        JButton btnCalc = new JButton("Calculate");
-        top.add(new JLabel("Domain:")); top.add(cbDomain);
-        top.add(new JLabel("Team:")); top.add(cbTeam);
-        top.add(btnCalc);
+private JPanel buildSimulatorPanel() {
+    JPanel p = new JPanel(new BorderLayout());
 
-        // Info output
-        JTextArea out = new JTextArea(12,80);
-        out.setEditable(false);
+    JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
+    JComboBox<model.DomainModel> cbDomain = new JComboBox<>();
+    JComboBox<model.TeamModel> cbTeam = new JComboBox<>();
+    JButton btnCalc = new JButton("Calculate");
+    JButton btnRefresh = new JButton("Refresh");
 
-        p.add(top, BorderLayout.NORTH);
-        p.add(new JScrollPane(out), BorderLayout.CENTER);
+    top.add(new JLabel("Domain:"));
+    top.add(cbDomain);
+    top.add(new JLabel("Team:"));
+    top.add(cbTeam);
+    top.add(btnCalc);
+    top.add(btnRefresh);
 
-        Runnable reloadBoxes = () -> {
-            try {
-                cbDomain.removeAllItems();
-                cbTeam.removeAllItems();
-                
-                List<Map<String,Object>> drows = DBManager.fetchAll("SELECT * FROM domaintable");
-                for (Map<String,Object> r : drows) {
-                    model.DomainModel dm = new model.DomainModel();
-                    dm.domainID = toInt(r.get("DomainID"));
-                    dm.name = (r.get("Name") == null) ? "" : r.get("Name").toString();
-                    dm.region = (r.get("Region") == null) ? "" : r.get("Region").toString();
-                    dm.difficulty = (r.get("Difficulty") == null) ? "" : r.get("Difficulty").toString();
-                    cbDomain.addItem(dm);
+    JTextArea out = new JTextArea(12, 80);
+    out.setEditable(false);
+
+    p.add(top, BorderLayout.NORTH);
+    p.add(new JScrollPane(out), BorderLayout.CENTER);
+
+    
+
+    Runnable reloadBoxes = () -> {
+        try {
+            cbDomain.removeAllItems();
+            cbTeam.removeAllItems();
+
+            List<Map<String, Object>> drows =
+                    DBManager.fetchAll("SELECT * FROM domaintable");
+
+            for (Map<String, Object> r : drows) {
+                model.DomainModel dm = new model.DomainModel();
+                dm.domainID = toInt(r.get("DomainID"));
+                dm.name = str(r.get("Name"));
+                dm.region = str(r.get("Region"));
+                dm.difficulty = str(r.get("Difficulty"));
+                cbDomain.addItem(dm);
+            }
+
+            List<Map<String, Object>> trows =
+                    DBManager.fetchAll("SELECT * FROM teamtable");
+
+            for (Map<String, Object> r : trows) {
+                model.TeamModel tm = new model.TeamModel();
+                tm.teamID = toInt(r.get("TeamID"));
+                tm.name = str(r.get("Name"));
+                tm.char1 = toInt(r.get("Char1"));
+                tm.char2 = toInt(r.get("Char2"));
+                tm.char3 = toInt(r.get("Char3"));
+                tm.char4 = toInt(r.get("Char4"));
+                cbTeam.addItem(tm);
+            }
+
+        } catch (SQLException ex) {
+            showError(ex);
+        }
+    };
+
+    btnRefresh.addActionListener(e -> reloadBoxes.run());
+
+    tabs.addChangeListener(e -> {
+        if (tabs.getSelectedIndex() == 6) {
+            reloadBoxes.run();
+        }
+    });
+
+    reloadBoxes.run();
+
+   btnCalc.addActionListener(e -> {
+    try {
+        DomainModel domain = (DomainModel) cbDomain.getSelectedItem();
+        TeamModel team = (TeamModel) cbTeam.getSelectedItem();
+
+        if (domain == null || team == null) {
+            JOptionPane.showMessageDialog(this, "Select domain and team");
+            return;
+        }
+
+        // =========================
+        // GET DOMAIN MOBS
+        // =========================
+        List<Map<String, Object>> mobs = DBManager.fetchAll(
+                "SELECT m.* FROM mobstable m " +
+                        "JOIN domain_mobs dm ON m.MobID = dm.MobID " +
+                        "WHERE dm.DomainID=?",
+                domain.domainID
+        );
+
+        // =========================
+        // VALIDATE COMPOSITION
+        // =========================
+        if (!validateDomainComposition(mobs, domain.difficulty)) {
+            out.setText(
+                    "❌ DOMAIN INVALID\n\n" +
+                    "Composition does not match required difficulty rules:\n" +
+                    domain.difficulty
+            );
+            return;
+        }
+
+        // =========================
+        // GET CHARACTERS
+        // =========================
+        List<Integer> charIDs = Arrays.asList(
+                team.char1, team.char2, team.char3, team.char4
+        );
+
+        List<Map<String, Object>> chars = DBManager.fetchAll(
+                "SELECT * FROM charactertable WHERE CharacterID IN (?,?,?,?)",
+                charIDs.get(0), charIDs.get(1), charIDs.get(2), charIDs.get(3)
+        );
+
+        if (chars.size() != 4) {
+            JOptionPane.showMessageDialog(this, "One or more characters do not exist.");
+            return;
+        }
+
+        // =========================
+        // LEVEL CHECK
+        // =========================
+        double avgLevel = chars.stream()
+                .mapToInt(m -> ((Number) m.get("Level")).intValue())
+                .average()
+                .orElse(0.0);
+
+        int required = difficultyRequirement(domain.difficulty);
+
+        if (avgLevel < required) {
+            out.setText(String.format(
+                    "❌ LEVEL TOO LOW\nAverage: %.2f\nRequired: %d\nDifficulty: %s",
+                    avgLevel, required, domain.difficulty
+            ));
+            return;
+        }
+
+        // =========================
+        // TEAM POWER CALCULATION
+        // =========================
+        double totalTeamPower = 0;
+        StringBuilder sb = new StringBuilder();
+
+        for (Map<String, Object> ch : chars) {
+
+            int level = ((Number) ch.get("Level")).intValue();
+            int wID = toInt(ch.get("WeaponID"));
+
+            int weaponAtk = 0;
+            if (wID > 0) {
+                List<Map<String, Object>> w = DBManager.fetchAll(
+                        "SELECT * FROM weapontable WHERE WeaponID=?",
+                        wID
+                );
+                if (!w.isEmpty()) {
+                    weaponAtk = toInt(w.get(0).get("Attack"));
                 }
-                List<Map<String,Object>> trows = DBManager.fetchAll("SELECT * FROM teamtable");
-                for (Map<String,Object> r : trows) {
-                    model.TeamModel tm = new model.TeamModel();
-                    tm.teamID = toInt(r.get("TeamID"));
-                    tm.name = (r.get("Name") == null) ? "" : r.get("Name").toString();
-                    tm.char1 = toInt(r.get("Char1")); tm.char2 = toInt(r.get("Char2"));
-                    tm.char3 = toInt(r.get("Char3")); tm.char4 = toInt(r.get("Char4"));
-                    cbTeam.addItem(tm);
-                }
-            } catch (SQLException ex) { showError(ex); }
-        };
+            }
 
-        reloadBoxes.run();
+            // =========================
+            // ARTIFACT BONUS SYSTEM
+            // =========================
+            int a1 = toInt(ch.get("Artifact1"));
+            int a2 = toInt(ch.get("Artifact2"));
+            int a3 = toInt(ch.get("Artifact3"));
+            int a4 = toInt(ch.get("Artifact4"));
 
-        btnCalc.addActionListener(e -> {
-            try {
-                DomainModel domain = (DomainModel) cbDomain.getSelectedItem();
-                TeamModel team = (TeamModel) cbTeam.getSelectedItem();
-                if (domain == null || team == null) { JOptionPane.showMessageDialog(this, "Select domain and team"); return; }
+            int artCount = 0;
+            if (a1 > 0) artCount++;
+            if (a2 > 0) artCount++;
+            if (a3 > 0) artCount++;
+            if (a4 > 0) artCount++;
 
-                // Validate average level vs difficulty
-                List<Integer> charIDs = Arrays.asList(team.char1, team.char2, team.char3, team.char4);
-                List<Map<String,Object>> chars = DBManager.fetchAll("SELECT * FROM charactertable WHERE CharacterID IN (?,?,?,?)",
-                        charIDs.get(0), charIDs.get(1), charIDs.get(2), charIDs.get(3));
-                if (chars.size() != 4) {
-                    JOptionPane.showMessageDialog(this, "One or more characters in the team ID list do not exist.");
-                    return;
-                }
-                double avgLevel = chars.stream().mapToInt(m -> ((Number)m.get("Level")).intValue()).average().orElse(0.0);
-                int required = difficultyRequirement(domain.difficulty);
-                if (avgLevel < required) {
-                    out.setText(String.format("Team average level is %.2f but domain difficulty %s requires average level %d. Team cannot enter.\n", avgLevel, domain.difficulty, required));
-                    return;
-                }
+            double artifactMultiplier = 2.1 + (0.5 * artCount);
 
-                // Build a simplified "power" metric for each character
-                double totalTeamPower = 0;
-                StringBuilder sb = new StringBuilder();
-                for (Map<String,Object> ch : chars) {
-                    int level = ((Number)ch.get("Level")).intValue();
-                    int wID = toInt(ch.get("WeaponID"));
-                    int weaponAtk = 0;
-                    if (wID > 0) {
-                        List<Map<String,Object>> w = DBManager.fetchAll("SELECT * FROM weapontable WHERE WeaponID=?", wID);
-                        if (!w.isEmpty()) weaponAtk = toInt(w.get(0).get("Attack"));
-                    }
-                    // approximate artifact main stat adds bonus: each artifact adds ~5% effective power
-                    int a1 = toInt(ch.get("Artifact1")), a2 = toInt(ch.get("Artifact2")), a3 = toInt(ch.get("Artifact3")), a4 = toInt(ch.get("Artifact4"));
-                    int artCount = 0; if (a1>0) artCount++; if (a2>0) artCount++; if (a3>0) artCount++; if (a4>0) artCount++;
-                    double artifactMultiplier = 1.0 + 0.05 * artCount;
+            double charPower =
+                    level * ((weaponAtk * 0.8) + 0.2) * artifactMultiplier;
 
-                    // character base power: level * (weaponAtk*0.6 + 10)
-                    double charPower = level * ((weaponAtk * 0.6) + 10) * artifactMultiplier;
-                    totalTeamPower += charPower;
-                    sb.append(String.format("Char %s (lvl %d) base power %.1f\n", ch.get("Name"), level, charPower));
-                }
+            totalTeamPower += charPower;
 
-                // Domain "difficulty multiplier" and target HP derived from difficulty
-                double domainMultiplier;
-                String diff = domain.difficulty;
-                if ("Easy".equalsIgnoreCase(diff)) domainMultiplier = 0.8;
-                else if ("Medium".equalsIgnoreCase(diff)) domainMultiplier = 1.0;
-                else if ("Hard".equalsIgnoreCase(diff)) domainMultiplier = 1.4;
-                else domainMultiplier = 2.0;
+            sb.append(String.format(
+                    "Char %s (lvl %d) power %.1f\n",
+                    ch.get("Name"), level, charPower
+            ));
+        }
 
-                // Domain HP baseline
-                double baseHP = 5000.0 * domainMultiplier * (1 + (difficultyRequirement(domain.difficulty) / 100.0));
-               
-                double estimatedDPS = totalTeamPower / 10.0; 
-                double timeToKill = baseHP / Math.max(1, estimatedDPS); 
+        // =========================
+        // DOMAIN HP CALCULATION
+        // =========================
+        double domainMultiplier;
 
-                boolean canBeat = timeToKill < 120;
+        switch (domain.difficulty.toUpperCase()) {
+            case "EASY": domainMultiplier = 0.8; break;
+            case "MEDIUM": domainMultiplier = 1.0; break;
+            case "HARD": domainMultiplier = 1.4; break;
+            default: domainMultiplier = 2.0;
+        }
 
-                sb.append("\nTotal team power: ").append(String.format("%.1f", totalTeamPower));
-                sb.append("\nDomain base HP approximated: ").append(String.format("%.0f", baseHP));
-                sb.append("\nEstimated team DPS: ").append(String.format("%.1f", estimatedDPS));
-                sb.append("\nEstimated time to kill: ").append(String.format("%.1f seconds", timeToKill));
-                sb.append("\nResult: ").append(canBeat ? "Team CAN beat the domain" : "Team CANNOT reliably beat the domain");
+        double baseHP = 0;
 
-                out.setText(sb.toString());
+        for (Map<String, Object> m : mobs) {
+            double hp = toDouble(m.get("HP"));
+            String type = str(m.get("MobType")).toUpperCase();
 
-            } catch (SQLException ex) { showError(ex); }
-        });
+            double typeMultiplier;
 
-        return p;
+            switch (type) {
+                case "DUELIST": typeMultiplier = 1.0; break;
+                case "MAGE": typeMultiplier = 1.2; break;
+                case "BOSS_MAGE": typeMultiplier = 1.6; break;
+                case "TANK_BOSS": typeMultiplier = 2.2; break;
+                default: typeMultiplier = 1.0;
+            }
+
+            baseHP += hp * typeMultiplier;
+        }
+
+        baseHP *= domainMultiplier;
+
+        // =========================
+        // SIMULATION
+        // =========================
+        double estimatedDPS = totalTeamPower / 10.0;
+        double timeToKill = baseHP / Math.max(1, estimatedDPS);
+
+        boolean canBeat = timeToKill < 120;
+
+        sb.append("\n====================\n");
+        sb.append("Total Team Power: ").append(String.format("%.1f", totalTeamPower)).append("\n");
+        sb.append("Domain HP: ").append(String.format("%.0f", baseHP)).append("\n");
+        sb.append("Estimated DPS: ").append(String.format("%.1f", estimatedDPS)).append("\n");
+        sb.append("Time to Kill: ").append(String.format("%.1f sec", timeToKill)).append("\n");
+        sb.append("Result: ").append(canBeat ? "WIN" : "LOSE");
+
+        out.setText(sb.toString());
+
+    } catch (SQLException ex) {
+        showError(ex);
     }
+});
+
+    return p;
+}
 
     // ---------------- Helpers ----------------
-    private static void clearFields(JTextField... fields) {
-        for (JTextField f : fields) f.setText("");
+private static void clearFields(JTextField... fields) {
+    for (JTextField f : fields) {
+        if (f != null) f.setText("");
     }
-    private static String nonEmpty(String s) { return s == null || s.trim().isEmpty() ? null : s.trim(); }
-    private static Integer emptyToNullInt(String s) { if (s==null || s.trim().isEmpty()) return null; return Integer.valueOf(s.trim()); }
-    private static int parseInt(String s) { if (s==null || s.trim().isEmpty()) return 0; return Integer.parseInt(s.trim()); }
-    private static double parseDouble(String s) { if (s==null || s.trim().isEmpty()) return 0.0; return Double.parseDouble(s.trim()); }
-    private static String str(Object o) { return o == null ? "" : o.toString(); }
-    private static int toInt(Object o) {
-        if (o == null) return 0;
-        if (o instanceof Number) return ((Number) o).intValue();
-        try {
-            return Integer.parseInt(o.toString());
-        } catch (NumberFormatException ex) {
-            return 0;
-        }
-    }
+}
 
-    private static int difficultyRequirement(String diff) {
-        if ("Easy".equalsIgnoreCase(diff)) return 20;
-        if ("Medium".equalsIgnoreCase(diff)) return 50;
-        if ("Hard".equalsIgnoreCase(diff)) return 90;
-        if ("Extreme".equalsIgnoreCase(diff)) return 100;
+private static String nonEmpty(String s) {
+    return (s == null || s.trim().isEmpty()) ? null : s.trim();
+}
+
+private static Integer emptyToNullInt(String s) {
+    try {
+        if (s == null || s.trim().isEmpty()) return null;
+        return Integer.valueOf(s.trim());
+    } catch (NumberFormatException e) {
+        return null;
+    }
+}
+
+private static int parseInt(String s) {
+    try {
+        if (s == null || s.trim().isEmpty()) return 0;
+        return Integer.parseInt(s.trim());
+    } catch (NumberFormatException e) {
         return 0;
     }
+}
 
-    private void showError(Exception ex) {
-        ex.printStackTrace();
-        JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
+private static double parseDouble(String s) {
+    try {
+        if (s == null || s.trim().isEmpty()) return 0.0;
+        return Double.parseDouble(s.trim());
+    } catch (NumberFormatException e) {
+        return 0.0;
     }
+}
+
+private static String str(Object o) {
+    return (o == null) ? "" : o.toString();
+}
+
+private static int toInt(Object o) {
+    if (o == null) return 0;
+    if (o instanceof Number) return ((Number) o).intValue();
+
+    try {
+        return Integer.parseInt(o.toString());
+    } catch (NumberFormatException ex) {
+        return 0;
+    }
+}
+
+private static double toDouble(Object o) {
+    if (o == null) return 0.0;
+    if (o instanceof Number) return ((Number) o).doubleValue();
+
+    try {
+        return Double.parseDouble(o.toString());
+    } catch (NumberFormatException ex) {
+        return 0.0;
+    }
+}
+
+private static int difficultyRequirement(String diff) {
+    if ("Easy".equalsIgnoreCase(diff)) return 20;
+    if ("Medium".equalsIgnoreCase(diff)) return 50;
+    if ("Hard".equalsIgnoreCase(diff)) return 90;
+    if ("Extreme".equalsIgnoreCase(diff)) return 100;
+    return 0;
+}
+
+private void showError(Exception ex) {
+    ex.printStackTrace();
+    JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
+}
+
+private boolean validateDomainComposition(List<Map<String, Object>> mobs, String difficulty) {
+
+    Map<String, Integer> count = new HashMap<>();
+
+    for (Map<String, Object> m : mobs) {
+        String type = str(m.get("MobType")).toUpperCase();
+        count.put(type, count.getOrDefault(type, 0) + 1);
+    }
+
+    switch (difficulty.toUpperCase()) {
+
+        case "EASY":
+            return count.getOrDefault(DUELIST, 0) >= 5;
+
+        case "MEDIUM":
+            return count.getOrDefault(DUELIST, 0) >= 5 &&
+                   count.getOrDefault(MAGE, 0) >= 3;
+
+        case "HARD":
+            return count.getOrDefault(DUELIST, 0) >= 5 &&
+                   count.getOrDefault(MAGE, 0) >= 5 &&
+                   count.getOrDefault(BOSS_MAGE, 0) >= 5;
+
+        case "EXTREME":
+            return count.getOrDefault(DUELIST, 0) >= 10 &&
+                   count.getOrDefault(MAGE, 0) >= 15 &&
+                   count.getOrDefault(BOSS_MAGE, 0) >= 20 &&
+                   count.getOrDefault(TANK_BOSS, 0) >= 5;
+    }
+
+    return false;
+}
+private double calculateDomainHP(int domainID, String difficulty) throws SQLException {
+
+    List<Map<String, Object>> mobs = DBManager.fetchAll(
+            "SELECT m.* FROM mobstable m " +
+            "JOIN domain_mobs dm ON m.MobID = dm.MobID " +
+            "WHERE dm.DomainID=?",
+            domainID
+    );
+
+    double totalHP = 0;
+
+    for (Map<String, Object> m : mobs) {
+        double hp = toDouble(m.get("HP"));
+        String type = str(m.get("MobType")).toUpperCase();
+
+        double multiplier;
+
+        switch (type) {
+            case DUELIST: multiplier = 1.0; break;
+            case MAGE: multiplier = 1.2; break;
+            case BOSS_MAGE: multiplier = 1.6; break;
+            case TANK_BOSS: multiplier = 2.2; break;
+            default: multiplier = 1.0;
+        }
+
+        totalHP += hp * multiplier;
+    }
+
+    double difficultyMultiplier;
+
+    switch (difficulty.toUpperCase()) {
+        case "EASY": difficultyMultiplier = 1.0; break;
+        case "MEDIUM": difficultyMultiplier = 1.3; break;
+        case "HARD": difficultyMultiplier = 1.7; break;
+        default: difficultyMultiplier = 2.2;
+    }
+
+    return totalHP * difficultyMultiplier;
+}
 
     // main
     public static void main(String[] args) {
